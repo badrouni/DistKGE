@@ -1,5 +1,5 @@
 # DistKGE
-“ChatGPT can answer any questions but AI needs context to answer accurately, that's why you need knowledge graphs.”  
+“ChatGPT can answer any questions but AI needs context to answer accurately, that's why you need knowledge graphs.”  Badrouni Marwa
 
 
 
