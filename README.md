@@ -12,4 +12,4 @@ their information for a multitude of tasks in machine learning. Nevertheless, th
 increase data in knowledge graph has introduced a challenge, especially as knowledge graph embedding now encompass millions of nodes and billions of edges,
 surpassing the capacities of existing knowledge representation learning systems.
 In response to these challenge, this work presents DistKGE, a distributed
-learning approach of knowledge graph embedding based on a new partitioning technique.
+learning approach of knowledge graph embedding.
