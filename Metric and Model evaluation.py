@@ -34,7 +34,7 @@ def eval(entity_embeddings, relation_embeddings, dataloader, kg_model, iters=Non
 
     if kg_model == "TransE":
       scores = torch.norm(head_embeds + relation_embeds - tail_embeds, p=1, dim=1)
-    elif kg_model == "ComplEx":
+    elif kg_model == "":
       # Get real and imaginary parts
       re_relation, im_relation = torch.chunk(relation_embeds, 2, dim=1)
       re_head, im_head = torch.chunk(head_embeds, 2, dim=1)
@@ -72,7 +72,7 @@ def eval(entity_embeddings, relation_embeddings, dataloader, kg_model, iters=Non
     mr_list.append(mr.item())
     
   
-  hits5 = sum(hits3_list)/len(hits1_list)
+  hits5 = sum(hits5_list)/len(hits1_list)
   hits10 = sum(hits10_list)/len(hits1_list)
   mr = sum(mr_list)/len(hits1_list)
   
