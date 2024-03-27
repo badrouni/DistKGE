@@ -30,8 +30,7 @@ from torch.utils.data import DataLoader, Dataset
 We focus here on a collaboratively collected knowledge base known by the name of **FB15K-237**, which is derived from Freebase repository. FB15K-237 is a cleaner version of its original counterpart FB15k with inverse relations removed and consists of 14541 entities and 237 relations.
 """
 
-!wget "https://github.com/kanishkg/fb15k-237/raw/main/fb15k-237-v1.zip"
-!tar -xzf fb15k-237-v1.zip
+
 
 meta_dict = {'eval metric': 'mrr',
              'task type': 'KG_completion',
@@ -303,38 +302,6 @@ def ComplEx_loss(pos_edges, neg_edges, pos_reltype, neg_reltype,
   loss += reg_loss
   return loss.mean()
 
-"""**RotatE**
-
----
-
-RotatE model can be seen as equivalent to TransE but in complex space. In this model, relations give angular rotation to the head entity embedding by an angle so as to make it closer to the tail entity embedding.
-
-The scoring function can be defined as - || h 𝗈 r - t || just like TransE but here we use rotation operator 'o' instead of simple addition.
-
-"""
-
-class RotatE(nn.Module):
-  def __init__(self, num_entities, num_relations, embedding_dim):
-    super(RotatE, self).__init__()
-    # entity embeddings has equal real and imaginary parts, so we double the dimension size
-    self.entity_embeddings = torch.nn.Parameter(torch.randn(num_entities, 2*embedding_dim))
-    self.relation_embeddings = torch.nn.Parameter(torch.randn(num_relations, embedding_dim))
-
-  def forward(self):
-    # return the embeddings as it is but we can regularize here by normalizing them
-    return self.entity_embeddings, self.relation_embeddings
-
-"""RotatE Loss"""
-
-def RotatE_loss(pos_edges, neg_edges, pos_reltype, neg_reltype, entity_embeddings, relation_embeddings,
-                gamma=5.0, epsilon=2.0):
-  # Select embeddings for both positive and negative samples
-  pos_head_embeds = torch.index_select(entity_embeddings, 0, pos_edges[:, 0])
-  pos_tail_embeds = torch.index_select(entity_embeddings, 0, pos_edges[:, 1])
-  neg_head_embeds = torch.index_select(entity_embeddings, 0, neg_edges[:, 0])
-  neg_tail_embeds = torch.index_select(entity_embeddings, 0, neg_edges[:, 1])
-  pos_relation_embeds = torch.index_select(relation_embeddings, 0, pos_reltype.squeeze())
-  neg_relation_embeds = torch.index_select(relation_embeddings, 0, neg_reltype.squeeze())
 
   # Dissect the embedding in equal chunks to get real and imaginary parts
   pos_re_head, pos_im_head = torch.chunk(pos_head_embeds, 2, dim=1)
@@ -386,15 +353,8 @@ def RotatE_loss(pos_edges, neg_edges, pos_reltype, neg_reltype, entity_embedding
 
 Helper routine to get the metric values given the predicted scores for a bunch of negative samples along with a positive sample that is always the first element at index 0. We currently have functionality to report these metrics:
 
-1) Hits@1
 
-2) Hits@3
 
-3) Hits@10
-
-4) Mean Rank
-
-5) Mean Reciprocal Rank
 """
 
 def eval_metrics(y_pred):
@@ -402,22 +362,20 @@ def eval_metrics(y_pred):
   # not using argsort to do the rankings to avoid bias when the scores are equal
   ranking_list = torch.nonzero(argsort == 0, as_tuple=False)
   ranking_list = ranking_list[:, 1] + 1
-  hits1_list = (ranking_list <= 1).to(torch.float)
-  hits3_list = (ranking_list <= 3).to(torch.float)
+  hits5_list = (ranking_list <= 5).to(torch.float)
   hits10_list = (ranking_list <= 10).to(torch.float)
   mr_list = ranking_list.to(torch.float)
-  mrr_list = 1./ranking_list.to(torch.float)
-  return hits1_list.mean(), hits3_list.mean(), hits10_list.mean(), mr_list.mean(), mrr_list.mean()
+
+  return  hits5_list.mean(), hits10_list.mean(), mr_list.mean()
 
 """Evaluation routine which given a head and relation, it ranks the original positive entity along with a bunch of negative entities on the basis of scoring criteria per model and calculates above metrics"""
 
 def eval(entity_embeddings, relation_embeddings, dataloader, kg_model, iters=None, gamma = 5.0, epsilon = 2.0):
 
-  hits1_list = []
-  hits3_list = []
+
+  hits5_list = []
   hits10_list = []
   mr_list = []
-  mrr_list = []
   data_iterator = iter(dataloader)
   if iters is None:
     iters = len(dataloader)
@@ -446,10 +404,7 @@ def eval(entity_embeddings, relation_embeddings, dataloader, kg_model, iters=Non
       scores = (re_score * re_tail + im_score * im_tail)
       # Negate as we want to rank scores in ascending order, lower the better
       scores = - scores.sum(dim=1)
-    elif kg_model == "RotatE":
-      # Get real and imaginary parts
-      re_head, im_head = torch.chunk(head_embeds, 2, dim=1)
-      re_tail, im_tail = torch.chunk(tail_embeds, 2, dim=1)
+
 
       # Make phases of relations uniformly distributed in [-pi, pi]
       embedding_range = 2 * (gamma + epsilon) / head_embeds.size(-1)
@@ -470,20 +425,19 @@ def eval(entity_embeddings, relation_embeddings, dataloader, kg_model, iters=Non
 
     scores = scores.view(b, num_samples)
 
-    hits1, hits3, hits10, mr, mrr = eval_metrics(scores)
-    hits1_list.append(hits1.item())
-    hits3_list.append(hits3.item())
+    hits5, hits10, mr = eval_metrics(scores)
+    hits5_list.append(hits5.item())
     hits10_list.append(hits10.item())
     mr_list.append(mr.item())
-    mrr_list.append(mrr.item())
 
-  hits1 = sum(hits1_list)/len(hits1_list)
-  hits3 = sum(hits3_list)/len(hits1_list)
+
+
+  hits5 = sum(hits5_list)/len(hits1_list)
   hits10 = sum(hits10_list)/len(hits1_list)
   mr = sum(mr_list)/len(hits1_list)
-  mrr = sum(mrr_list)/len(hits1_list)
 
-  return hits1, hits3, hits10, mr, mrr
+
+  return  hit5, hits10, mr
 
 """# Training"""
 
@@ -502,9 +456,7 @@ if kg_model == "TransE":
 elif kg_model == "ComplEx":
     model = ComplEx(num_entities, num_relations, 100)
     model_loss = ComplEx_loss
-elif kg_model == "RotatE":
-    model = RotatE(num_entities, num_relations, 50)
-    model_loss = RotatE_loss
+
 else:
     raise ValueError('Unsupported model %s' % kg_model)
 
@@ -525,15 +477,15 @@ print(f'Val dataset size {len(val_dataset)}')
 print(f'Test dataset size {len(test_dataset)}')
 
 # use adam optimizer for training
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.DSGD(model.parameters(), lr=learning_rate)
 
 for e in range(epochs):
   losses = []
   # check evaluation metrics every 10th epoch
   if e%10 == 0:
     model.eval()
-    h1, h3, h10, mr, mrr = eval(model.entity_embeddings, model.relation_embeddings, val_eval_dataloader, kg_model, iters=10)
-    print(f"hits@1:{h1} hits@3:{h3} hits@10:{h10} mr:{mr} mrr:{mrr}")
+    h5, h10, mr = eval(model.entity_embeddings, model.relation_embeddings, val_eval_dataloader, kg_model, iters=10)
+    print(f" hits@5:{h5} hits@10:{h10} mr:{mr} ")
   model.train()
   for step, batch in enumerate(tqdm.tqdm(train_dataloader, desc="Training")):
     # generate positive as well as negative samples for training
