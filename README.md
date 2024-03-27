@@ -11,8 +11,5 @@ with reduced dimensions. These embeddings are progressively used to extract
 their information for a multitude of tasks in machine learning. Nevertheless, the
 increase data in knowledge graph has introduced a challenge, especially as knowledge graph embedding now encompass millions of nodes and billions of edges,
 surpassing the capacities of existing knowledge representation learning systems.
-In response to these challenge, this paper presents DistKGE, a distributed
-learning approach of knowledge graph embedding based on a new partitioning technique. In our experimental evaluation, we illustrate that the proposed
-approach improves the scalability of distributed knowledge graph learning with
-respect to graph size compared to existing methods in terms of runtime performances in the link prediction task aimed at identifying new links between entities
-within the knowledge graph.
+In response to these challenge, this work presents DistKGE, a distributed
+learning approach of knowledge graph embedding based on a new partitioning technique.
